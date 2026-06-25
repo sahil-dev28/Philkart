@@ -1,0 +1,23 @@
+{
+  "name": "@philkart/db",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@philkart/env": "workspace:*",
+    "dotenv": "catalog:",
+    "mongoose": "^9.6.2",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@philkart/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
