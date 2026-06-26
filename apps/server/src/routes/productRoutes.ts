@@ -19,5 +19,5 @@ productRouter.route("/").post(validateData(createProductSchema), createProduct);
 
 productRouter.route("/").get(async (req, res) => {
   res.setHeader("Content-Type", "application/json");
-  await pipeline(Readable.from(createProducts(200000)), res);
+  await pipeline(Readable.from(createProducts(100000)), res);
 });
