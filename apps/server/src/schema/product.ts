@@ -6,11 +6,13 @@ export const createProductSchema = z.object({
     .string()
     .min(3, "Name must be at least 3 characters")
     .max(30, "Name cannot exceed 30 characters"),
-  category: z.enum(categoryNames),
+  category: z.enum(categoryNames, {
+    error: "Invalid category",
+  }),
   price: z.number({
     error: "Price is required",
   }),
-  image: z.url(),
+  image: z.url("Invalid image URL"),
   description: z
     .string()
     .min(20, "Description must be at least 20 characters")

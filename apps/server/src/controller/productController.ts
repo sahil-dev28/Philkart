@@ -8,18 +8,16 @@ export const createProduct = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { category, ...rest } = req.body;
+    const { category: categoryName, ...rest } = req.body;
 
-    const categoryDoc = await Category.findOne({ name: category });
+    const categoryDoc = await Category.findOne({ name: categoryName });
 
     if (!categoryDoc) {
-      res.status(400).json({ message: "Invalid category" });
+      res.status(400).json({ message: `Category "${categoryName}" not found` });
+      return;
     }
 
-    const newProduct = new Product({
-      ...rest,
-      categoryId: categoryDoc?._id,
-    });
+    const newProduct = new Product({ ...rest, category: categoryDoc._id });
 
     await newProduct.save();
 
