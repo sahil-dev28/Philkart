@@ -1,6 +1,7 @@
 import { faker } from "@faker-js/faker";
 import { categoryNames } from "@/schema/category";
-import type { CreateProductInput } from "../schema/product";
+import { type CreateProductInput } from "../schema/product";
+import { Worker } from "worker_threads";
 
 export const createProduct = () => {
   return {
@@ -12,24 +13,27 @@ export const createProduct = () => {
   };
 };
 
-// export const createProducts = async (
-//   total: number,
-//   batchSize = 1000,
-// ): Promise<CreateProductInput[]> => {
-//   const result: CreateProductInput[] = [];
+export const createProductsWithPromise = async (
+  total: number,
+  batchSize = 1000,
+): Promise<CreateProductInput[]> => {
+  const result: CreateProductInput[] = [];
 
-//   for (let i = 0; i < total; i++) {
-//     result.push(createProduct());
+  for (let i = 0; i < total; i++) {
+    result.push(createProduct());
 
-//     if ((i + 1) % batchSize === 0) {
-//       await new Promise<void>((resolve) => setImmediate(resolve));
-//     }
-//   }
+    if ((i + 1) % batchSize === 0) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  }
 
-//   return result;
-// };
+  return result;
+};
 
-export async function* createProducts(total: number, batchSize = 1000) {
+export async function* createProductsWithStreaming(
+  total: number,
+  batchSize = 100,
+) {
   yield '{"products":[';
 
   let firstChunk = true;
@@ -42,6 +46,7 @@ export async function* createProducts(total: number, batchSize = 1000) {
       yield (firstChunk ? "" : ",") + batch.join(",");
       batch = [];
       firstChunk = false;
+      await new Promise((resolve) => setImmediate(resolve)); // hand control back to the event loop
     }
   }
 
@@ -50,4 +55,47 @@ export async function* createProducts(total: number, batchSize = 1000) {
   }
 
   yield "]}";
+}
+const TOTAL = 200000;
+const BATCH_SIZE = 1000;
+const THREAD_COUNT = 4;
+
+export function createProductWithWorker(): Promise<CreateProductInput[]> {
+  return new Promise((resolve, reject) => {
+    const perThread = Math.ceil(TOTAL / THREAD_COUNT);
+
+    let completed = 0;
+    let settled = false;
+    const results: CreateProductInput[] = [];
+
+    for (let i = 0; i < THREAD_COUNT; i++) {
+      const worker = new Worker(
+        new URL("../worker/worker-product.js", import.meta.url),
+      );
+
+      worker.on("message", (data: CreateProductInput[]) => {
+        results.push(...data);
+        completed++;
+        worker.terminate(); // terminate AFTER it returns results
+
+        if (completed === THREAD_COUNT && !settled) {
+          settled = true;
+          resolve(results);
+        }
+      });
+
+      worker.on("error", (error) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+        worker.terminate();
+      });
+
+      worker.postMessage({
+        total: perThread,
+        batchSize: BATCH_SIZE,
+      });
+    }
+  });
 }
