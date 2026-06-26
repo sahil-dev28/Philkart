@@ -14,16 +14,13 @@ export const createProduct = () => {
 
 export const createProducts = async (
   total: number,
-  batchSize = 1000
+  batchSize = 1000,
 ): Promise<CreateProductInput[]> => {
   const result: CreateProductInput[] = [];
 
   for (let i = 0; i < total; i++) {
     result.push(createProduct());
 
-    // Yield to the event loop after each batch so we don't block it.
-    // setImmediate schedules a macrotask, letting pending I/O (e.g. other
-    // incoming requests) run between batches.
     if ((i + 1) % batchSize === 0) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }

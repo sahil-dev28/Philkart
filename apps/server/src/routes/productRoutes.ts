@@ -8,7 +8,7 @@ export const productRouter: Router = Router();
 
 productRouter.route("/").post(validateData(createProductSchema), createProduct);
 productRouter.route("/").get(async (req, res) => {
-  const products = await createProducts(1000000);
+  const products = await createProducts(100000);
   res.status(200).json({
     products,
   });
