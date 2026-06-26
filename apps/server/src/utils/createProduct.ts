@@ -12,19 +12,42 @@ export const createProduct = () => {
   };
 };
 
-export const createProducts = async (
-  total: number,
-  batchSize = 1000,
-): Promise<CreateProductInput[]> => {
-  const result: CreateProductInput[] = [];
+// export const createProducts = async (
+//   total: number,
+//   batchSize = 1000,
+// ): Promise<CreateProductInput[]> => {
+//   const result: CreateProductInput[] = [];
+
+//   for (let i = 0; i < total; i++) {
+//     result.push(createProduct());
+
+//     if ((i + 1) % batchSize === 0) {
+//       await new Promise<void>((resolve) => setImmediate(resolve));
+//     }
+//   }
+
+//   return result;
+// };
+
+export async function* createProducts(total: number, batchSize = 1000) {
+  yield '{"products":[';
+
+  let firstChunk = true;
+  let batch: string[] = [];
 
   for (let i = 0; i < total; i++) {
-    result.push(createProduct());
+    batch.push(JSON.stringify(createProduct()));
 
-    if ((i + 1) % batchSize === 0) {
-      await new Promise<void>((resolve) => setImmediate(resolve));
+    if (batch.length === batchSize) {
+      yield (firstChunk ? "" : ",") + batch.join(",");
+      batch = [];
+      firstChunk = false;
     }
   }
 
-  return result;
-};
+  if (batch.length > 0) {
+    yield (firstChunk ? "" : ",") + batch.join(",");
+  }
+
+  yield "]}";
+}
