@@ -7,10 +7,10 @@ export const createProductSchema = z.object({
     .min(3, "Name must be at least 3 characters")
     .max(30, "Name cannot exceed 30 characters"),
   category: z.enum(categoryNames),
-  price: z.number(),
-  image: z.any().refine((val) => val instanceof File, {
-    message: "Product image is required",
+  price: z.number({
+    error: "Price is required",
   }),
+  image: z.url(),
   description: z
     .string()
     .min(20, "Description must be at least 20 characters")

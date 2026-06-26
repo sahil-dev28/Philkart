@@ -17,11 +17,11 @@ app.use(
 
 app.use(express.json());
 
-app.get("/", (_req, res) => {
+app.get("/api/v1/health", (_req, res) => {
   res.status(200).send("OK");
 });
 
-app.use("/api/v1/product", productRouter);
+app.use("/api/v1/products", productRouter);
 app.use("/api/v1/category", categoryRouter);
 
 const port = Number(process.env.PORT) || 8001;
