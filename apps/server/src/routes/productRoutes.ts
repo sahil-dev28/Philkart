@@ -1,39 +1,24 @@
 import { Router } from "express";
-import {
-  createProductsWithPromise,
-  createProductsWithStreaming,
-  createProductWithWorker,
-} from "@/utils/createProduct";
-import { createProduct } from "../controller/productController";
-import { validateData } from "../middleware/validationMiddleware";
 
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import { createProductSchema } from "@/schema/product";
+
+import {
+  createProduct,
+  generateProductsBuffered,
+  generateProductsParallel,
+  streamProducts,
+} from "../controller/productController";
+import { validateData } from "../middleware/validationMiddleware";
 
 export const productRouter: Router = Router();
 
 productRouter.route("/").post(validateData(createProductSchema), createProduct);
-productRouter.route("/promise").get(async (_req, res) => {
-  const products = await createProductsWithPromise(100000);
-  res.status(200).json({
-    products,
-  });
-});
 
-productRouter.route("/streaming").get(async (_req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  try {
-    await pipeline(Readable.from(createProductsWithStreaming(10000)), res);
-  } catch {
-    if (!res.headersSent) res.status(500).end();
-    // else: stream already started, let pipeline clean up the streams
-  }
-});
+// Route with promise
+productRouter.route("/promise").get(generateProductsBuffered);
 
-productRouter.route("/worker").get(async (_req, res) => {
-  const products = await createProductWithWorker();
-  res.status(200).json({
-    products,
-  });
-});
+// Route with streaming
+productRouter.route("/streaming").get(streamProducts);
+
+// Route with worker thread
+productRouter.route("/worker").get(generateProductsParallel);

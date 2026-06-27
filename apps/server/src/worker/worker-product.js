@@ -1,12 +1,12 @@
 import { parentPort } from "node:worker_threads";
 
-import { createProduct } from "@/utils/createProduct";
+import { generateProduct } from "@/utils/generateProduct";
 
-export const createProducts = async (total, batchSize = 1000) => {
+export const generateProducts = async (total, batchSize = 1000) => {
   const result = [];
 
   for (let i = 0; i < total; i++) {
-    result.push(createProduct());
+    result.push(generateProduct());
 
     if ((i + 1) % batchSize === 0) {
       await new Promise((resolve) => setImmediate(resolve));
@@ -17,6 +17,6 @@ export const createProducts = async (total, batchSize = 1000) => {
 };
 
 parentPort.on("message", async (data) => {
-  const result = await createProducts(data.total, data.batchSize);
+  const result = await generateProducts(data.total, data.batchSize);
   parentPort?.postMessage(result);
 });

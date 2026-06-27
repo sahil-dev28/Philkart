@@ -1,9 +1,12 @@
-import { faker } from "@faker-js/faker";
-import { categoryNames } from "@/schema/category";
-import { type CreateProductInput } from "../schema/product";
-import { Worker } from "worker_threads";
+import { Worker } from "node:worker_threads";
 
-export const createProduct = () => {
+import { faker } from "@faker-js/faker";
+
+import { categoryNames } from "@/schema/category";
+
+import type { CreateProductInput } from "../schema/product";
+
+export const generateProduct = () => {
   return {
     name: faker.commerce.productName().slice(0, 30),
     category: faker.helpers.arrayElement(categoryNames),
@@ -13,14 +16,15 @@ export const createProduct = () => {
   };
 };
 
-export const createProductsWithPromise = async (
+// Generating Products With Promise
+export const generateProductsWithPromise = async (
   total: number,
   batchSize = 1000,
 ): Promise<CreateProductInput[]> => {
   const result: CreateProductInput[] = [];
 
   for (let i = 0; i < total; i++) {
-    result.push(createProduct());
+    result.push(generateProduct());
 
     if ((i + 1) % batchSize === 0) {
       await new Promise<void>((resolve) => setImmediate(resolve));
@@ -30,7 +34,8 @@ export const createProductsWithPromise = async (
   return result;
 };
 
-export async function* createProductsWithStreaming(
+// Generating Products With Streaming
+export async function* generateProductsWithStreaming(
   total: number,
   batchSize = 100,
 ) {
@@ -40,7 +45,7 @@ export async function* createProductsWithStreaming(
   let batch: string[] = [];
 
   for (let i = 0; i < total; i++) {
-    batch.push(JSON.stringify(createProduct()));
+    batch.push(JSON.stringify(generateProduct()));
 
     if (batch.length === batchSize) {
       yield (firstChunk ? "" : ",") + batch.join(",");
@@ -56,11 +61,13 @@ export async function* createProductsWithStreaming(
 
   yield "]}";
 }
-const TOTAL = 200000;
+
+// Generating Products With Worker Thread
+const TOTAL = 100000;
 const BATCH_SIZE = 1000;
 const THREAD_COUNT = 4;
 
-export function createProductWithWorker(): Promise<CreateProductInput[]> {
+export function generateProductsWithWorker(): Promise<CreateProductInput[]> {
   return new Promise((resolve, reject) => {
     const perThread = Math.ceil(TOTAL / THREAD_COUNT);
 
