@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { useProducts } from "@/features/products/hooks/use-products";
 import { useProductStore } from "@/store/product-store";
 
@@ -11,7 +13,8 @@ import { StatusLine } from "./status-line";
 import { Toolbar } from "./toolbar";
 
 export function ProductStudio() {
-  const { data, isPending, isError, error, refetch } = useProducts();
+  const { data, isPending, isPlaceholderData, isError, error, refetch } =
+    useProducts();
   const page = useProductStore((s) => s.page);
   const perPage = useProductStore((s) => s.perPage);
   const setPage = useProductStore((s) => s.setPage);
@@ -20,8 +23,14 @@ export function ProductStudio() {
   const pages = Math.max(1, Math.ceil(total / perPage));
   const products = data?.data ?? [];
 
+  // Jump back to the top so the new page's products start in view.
+  const scrollRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
+
   return (
-    <main className="min-h-0 overflow-y-auto">
+    <main ref={scrollRef} className="min-h-0 overflow-y-auto">
       <div className="mx-auto max-w-[1180px] px-8 pt-10 pb-20">
         <header className="mb-7 flex flex-wrap items-end justify-between gap-6">
           <div>
@@ -48,6 +57,7 @@ export function ProductStudio() {
           <ProductGrid
             products={products}
             isLoading={isPending}
+            isFetching={isPlaceholderData}
             skeletonCount={Math.min(perPage, 12)}
           />
         )}

@@ -1,4 +1,5 @@
 import { Skeleton } from "@philkart/ui/components/skeleton";
+import { cn } from "@philkart/ui/lib/utils";
 
 import type { Product } from "@/types/product";
 
@@ -10,13 +11,17 @@ const GRID =
 
 interface ProductGridProps {
   products: Product[];
+  /** First load with no data yet — show skeletons. */
   isLoading: boolean;
+  /** Page/filter/sort change while previous data is still shown — dim + overlay. */
+  isFetching?: boolean;
   skeletonCount?: number;
 }
 
 export function ProductGrid({
   products,
   isLoading,
+  isFetching = false,
   skeletonCount = 8,
 }: ProductGridProps) {
   if (isLoading) {
@@ -34,10 +39,25 @@ export function ProductGrid({
   }
 
   return (
-    <div className={GRID}>
-      {products.map((product) => (
-        <ProductCard key={product._id} product={product} />
-      ))}
+    <div className="relative">
+      {isFetching ? (
+        <div className="pointer-events-none absolute inset-x-0 -top-3 z-10 h-1 overflow-hidden rounded-full bg-primary/15">
+          <div className="animate-indeterminate h-full w-2/5 rounded-full bg-primary" />
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          GRID,
+          "transition-opacity duration-200",
+          isFetching && "pointer-events-none opacity-50",
+        )}
+        aria-busy={isFetching}
+      >
+        {products.map((product) => (
+          <ProductCard key={product._id} product={product} />
+        ))}
+      </div>
     </div>
   );
 }
