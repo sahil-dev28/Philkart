@@ -6,8 +6,6 @@ import { Category } from "@/models/Category";
 import { Product, type ProductAttrs } from "@/models/Product";
 import { categoryNames } from "@/schema/category";
 
-import type { CreateProductInput } from "../schema/product";
-
 export const generateProduct = () => {
   return {
     name: faker.commerce.productName().slice(0, 30),
@@ -82,40 +80,48 @@ export async function* generateProductsWithStreaming(
   yield "]}";
 }
 
-// Generating Products With Worker Thread
-const TOTAL = 100000;
-const BATCH_SIZE = 1000;
 const THREAD_COUNT = 4;
 
-export async function generateProductsWithWorker(): Promise<
-  CreateProductInput[]
-> {
+export async function generateProductsWithWorker(total: number): Promise<void> {
   const categories = await Category.find({}, { name: 1 }).lean();
-  const categoriesList = categories.map((cat) => ({
-    name: cat.name,
-    _id: cat._id.toString(),
-  }));
+
+  if (categories.length === 0) {
+    throw new Error(
+      "No categories found — seed categories before generating products",
+    );
+  }
+
+  const categoryIdByName = new Map(
+    categories.map((cat) => [cat.name, String(cat._id)]),
+  );
 
   return new Promise((resolve, reject) => {
-    const perThread = Math.ceil(TOTAL / THREAD_COUNT);
+    const perThread = Math.ceil(total / THREAD_COUNT);
 
     let completed = 0;
     let settled = false;
-    const results: CreateProductInput[] = [];
 
     for (let i = 0; i < THREAD_COUNT; i++) {
       const worker = new Worker(
         new URL("../worker/worker-product.js", import.meta.url),
       );
 
-      worker.on("message", (data: CreateProductInput[]) => {
-        results.push(...data);
+      worker.on("message", (msg) => {
+        if (msg?.error) {
+          if (!settled) {
+            settled = true;
+            reject(new Error(msg.error));
+          }
+          worker.terminate();
+          return;
+        }
+
         completed++;
         worker.terminate();
 
         if (completed === THREAD_COUNT && !settled) {
           settled = true;
-          resolve(results);
+          resolve();
         }
       });
 
@@ -129,7 +135,7 @@ export async function generateProductsWithWorker(): Promise<
 
       worker.postMessage({
         total: perThread,
-        categories: categoriesList,
+        categories: categoryIdByName,
       });
     }
   });

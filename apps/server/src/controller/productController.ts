@@ -5,7 +5,6 @@ import type { Request, Response } from "express";
 
 import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
-import Page from "../../../web/.next/dev/types/routes";
 import {
   generateProductsWithPromise,
   generateProductsWithStreaming,
@@ -52,10 +51,16 @@ export const generateProductsBuffered = async (
     });
   }
 
-  await generateProductsWithPromise(numberCount);
-  res.status(200).json({
-    message: "Product generated with Promise",
-  });
+  try {
+    await generateProductsWithPromise(numberCount);
+    res.status(200).json({
+      message: "Product generated with Promise",
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 };
 
 // Stream products to the client as they are generated
@@ -73,31 +78,63 @@ export const streamProducts = async (
 
 // Generate products in parallel across worker threads
 export const generateProductsParallel = async (
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> => {
-  await generateProductsWithWorker();
-  res.status(200).json({
-    message: "Product generated with Worker Thread",
-  });
+  const { count } = req.query;
+  const numberCount = Number(count);
+
+  if (Number.isNaN(numberCount)) {
+    res.status(400).json({
+      error: "Count should be a number",
+    });
+  }
+
+  try {
+    await generateProductsWithWorker(numberCount);
+    res.status(200).json({
+      message: "Product generated with Worker Thread",
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 };
+
+const SORTABLE = {
+  newest: { createdAt: -1 },
+  oldest: { createdAt: 1 },
+  aToZ: {
+    name: -1,
+  },
+  zToA: {
+    name: 1,
+  },
+  highest: {
+    price: -1,
+  },
+  lowest: {
+    price: 1,
+  },
+} as const;
 
 export const getProducts = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    const page = Number(req.query.Page) || 1;
+    const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
+    const sort = req.query.sort as keyof typeof SORTABLE;
 
-    if (page < 1 || limit < 1) {
-      res.status(400).json({ error: "page and limit must be positive number" });
-    }
+    const sortingOption = SORTABLE[sort || "newest"];
 
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
-      Product.find({}).skip(skip).limit(limit).lean(),
+      Product.find({}).sort(sortingOption).skip(skip).limit(limit).lean(),
+      Product.countDocuments({}),
     ]);
 
     res.status(200).json({
