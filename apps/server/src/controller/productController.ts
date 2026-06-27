@@ -5,6 +5,7 @@ import type { Request, Response } from "express";
 
 import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
+import Page from "../../../web/.next/dev/types/routes";
 import {
   generateProductsWithPromise,
   generateProductsWithStreaming,
@@ -53,7 +54,7 @@ export const generateProductsBuffered = async (
 
   await generateProductsWithPromise(numberCount);
   res.status(200).json({
-    message: "Product generated with promise",
+    message: "Product generated with Promise",
   });
 };
 
@@ -67,7 +68,6 @@ export const streamProducts = async (
     await pipeline(Readable.from(generateProductsWithStreaming(10000)), res);
   } catch {
     if (!res.headersSent) res.status(500).end();
-    // else: stream already started, let pipeline clean up the streams
   }
 };
 
@@ -76,16 +76,38 @@ export const generateProductsParallel = async (
   _req: Request,
   res: Response,
 ): Promise<void> => {
-  const products = await generateProductsWithWorker();
+  await generateProductsWithWorker();
   res.status(200).json({
-    products,
+    message: "Product generated with Worker Thread",
   });
 };
 
-export const getProducts = (req, res) => {
-  res.status(200).json({
-    page: 1,
-    total: 100,
-    data: [],
-  });
+export const getProducts = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const page = Number(req.query.Page) || 1;
+    const limit = Number(req.query.limit) || 20;
+
+    if (page < 1 || limit < 1) {
+      res.status(400).json({ error: "page and limit must be positive number" });
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      Product.find({}).skip(skip).limit(limit).lean(),
+    ]);
+
+    res.status(200).json({
+      page,
+      total,
+      data,
+    });
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 };

@@ -87,7 +87,15 @@ const TOTAL = 100000;
 const BATCH_SIZE = 1000;
 const THREAD_COUNT = 4;
 
-export function generateProductsWithWorker(): Promise<CreateProductInput[]> {
+export async function generateProductsWithWorker(): Promise<
+  CreateProductInput[]
+> {
+  const categories = await Category.find({}, { name: 1 }).lean();
+  const categoriesList = categories.map((cat) => ({
+    name: cat.name,
+    _id: cat._id.toString(),
+  }));
+
   return new Promise((resolve, reject) => {
     const perThread = Math.ceil(TOTAL / THREAD_COUNT);
 
@@ -103,7 +111,7 @@ export function generateProductsWithWorker(): Promise<CreateProductInput[]> {
       worker.on("message", (data: CreateProductInput[]) => {
         results.push(...data);
         completed++;
-        worker.terminate(); // terminate AFTER it returns results
+        worker.terminate();
 
         if (completed === THREAD_COUNT && !settled) {
           settled = true;
@@ -121,7 +129,7 @@ export function generateProductsWithWorker(): Promise<CreateProductInput[]> {
 
       worker.postMessage({
         total: perThread,
-        batchSize: BATCH_SIZE,
+        categories: categoriesList,
       });
     }
   });

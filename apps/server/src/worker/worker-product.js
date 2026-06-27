@@ -2,18 +2,23 @@ import { parentPort } from "node:worker_threads";
 
 import { generateProduct } from "@/utils/generateProduct";
 
-export const generateProducts = async (total, batchSize = 1000) => {
-  const result = [];
+export const generateProducts = async (total, categoryList) => {
+  const categoryIdByName = new Map(
+    categoryList.map((cat) => [cat.name, cat._id]),
+  );
+  const batch = [];
 
   for (let i = 0; i < total; i++) {
-    result.push(generateProduct());
+    const { name, category, image, price, description } = generateProduct();
+    const categoryId = categoryIdByName.get(category);
+    // result.push(generateProduct());
 
-    if ((i + 1) % batchSize === 0) {
-      await new Promise((resolve) => setImmediate(resolve));
+    if (categoryId) {
+      batch.push({ name, category: categoryId, price, image, description });
     }
   }
 
-  return result;
+  return batch;
 };
 
 parentPort.on("message", async (data) => {
