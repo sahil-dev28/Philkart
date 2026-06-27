@@ -39,10 +39,19 @@ export const createProduct = async (
 
 // Generate the full batch in memory, then respond
 export const generateProductsBuffered = async (
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> => {
-  await generateProductsWithPromise(100000);
+  const { count } = req.query;
+  const numberCount = Number(count);
+
+  if (Number.isNaN(numberCount)) {
+    res.status(400).json({
+      error: "Count should be a number",
+    });
+  }
+
+  await generateProductsWithPromise(numberCount);
   res.status(200).json({
     message: "Product generated with promise",
   });

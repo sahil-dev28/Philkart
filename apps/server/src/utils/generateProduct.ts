@@ -2,11 +2,11 @@ import { Worker } from "node:worker_threads";
 
 import { faker } from "@faker-js/faker";
 
+import { Category } from "@/models/Category";
+import { Product, type ProductAttrs } from "@/models/Product";
 import { categoryNames } from "@/schema/category";
 
 import type { CreateProductInput } from "../schema/product";
-import { Category } from "@/models/Category";
-import { Product } from "@/models/Product";
 
 export const generateProduct = () => {
   return {
@@ -23,25 +23,34 @@ export const generateProductsWithPromise = async (
   total: number,
   batchSize = 1000,
 ): Promise<void> => {
+  const categories = await Category.find({}, { name: 1 }).lean();
+  const categoryIdByName = new Map(categories.map((c) => [c.name, c._id]));
+
+  if (categoryIdByName.size === 0) {
+    throw new Error(
+      "No categories found — seed categories before generating products",
+    );
+  }
+
+  type ProductSeed = Omit<ProductAttrs, "createdAt" | "updatedAt">;
+  let batch: ProductSeed[] = [];
+
   for (let i = 0; i < total; i++) {
     const { name, category, image, price, description } = generateProduct();
-    const categoryDoc = await Category.findOne({ name: category });
+    const categoryId = categoryIdByName.get(category);
 
-    if (categoryDoc) {
-      const newProduct = new Product({
-        name,
-        category: categoryDoc._id,
-        price,
-        image,
-        description,
-      });
-
-      await newProduct.save();
+    if (categoryId) {
+      batch.push({ name, category: categoryId, price, image, description });
     }
 
-    if ((i + 1) % batchSize === 0) {
-      await new Promise<void>((resolve) => setImmediate(resolve));
+    if (batch.length === batchSize) {
+      await Product.insertMany<ProductSeed>(batch, { ordered: false });
+      batch = [];
     }
+  }
+
+  if (batch.length > 0) {
+    await Product.insertMany<ProductSeed>(batch, { ordered: false });
   }
 };
 
