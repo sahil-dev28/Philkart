@@ -106,10 +106,10 @@ const SORTABLE = {
   newest: { createdAt: -1 },
   oldest: { createdAt: 1 },
   aToZ: {
-    name: -1,
+    name: 1,
   },
   zToA: {
-    name: 1,
+    name: -1,
   },
   highest: {
     price: -1,
@@ -127,14 +127,22 @@ export const getProducts = async (
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
     const sort = req.query.sort as keyof typeof SORTABLE;
+    const category = req.query.category as string | undefined;
 
     const sortingOption = SORTABLE[sort || "newest"];
 
     const skip = (page - 1) * limit;
 
+    const filter = category ? { category } : {};
+
     const [data, total] = await Promise.all([
-      Product.find({}).sort(sortingOption).skip(skip).limit(limit).lean(),
-      Product.countDocuments({}),
+      Product.find(filter)
+        .populate("category", "name slug")
+        .sort(sortingOption)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(filter),
     ]);
 
     res.status(200).json({
