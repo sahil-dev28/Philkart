@@ -15,7 +15,7 @@ export const createCategorySchema = z.object({
     error: (issue) =>
       issue.input === undefined
         ? "Category name is required"
-        : `Categort must be one of ${categoryNames.join(", ")}`,
+        : `Category must be one of ${categoryNames.join(", ")}`,
   }),
 });
 
