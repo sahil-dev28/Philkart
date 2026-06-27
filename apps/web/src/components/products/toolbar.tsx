@@ -32,20 +32,25 @@ const PER_PAGE_ITEMS: Record<string, string> = Object.fromEntries(
 );
 
 interface ToolbarProps {
-  total: number;
+  total: number | null;
   page: number;
-  pages: number;
+  offset: number;
+  loaded: number;
+  perPage: number;
 }
 
-export function Toolbar({ total, page, pages }: ToolbarProps) {
-  const { sort, category, perPage, setSort, setCategory, setPerPage } =
-    useFilters();
+export function Toolbar({ total, page, offset, loaded, perPage }: ToolbarProps) {
+  const { sort, category, setSort, setCategory, setPerPage } = useFilters();
   const { data: categories } = useCategories();
 
-  const from = total === 0 ? 0 : (page - 1) * perPage + 1;
-  const to = Math.min(page * perPage, total);
+  const from = !total || loaded === 0 ? 0 : offset + 1;
+  const to = offset + loaded;
   const rangeText =
-    total === 0 ? "—" : `${from}–${to} of ${total} · page ${page}/${pages}`;
+    total == null
+      ? `Showing ${loaded}`
+      : total === 0
+        ? "—"
+        : `${from}–${to} of ${total} · page ${page}`;
 
   const categoryItems: Record<string, string> = {
     all: "All categories",

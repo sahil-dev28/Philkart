@@ -8,13 +8,17 @@ import type {
 export async function getProducts(
   params: GetProductsParams,
 ): Promise<ProductsResponse> {
-  const { page, limit, sort, category } = params;
+  const { cursor, direction, anchor, limit, sort, category } = params;
 
   const { data } = await api.get<ProductsResponse>("/products", {
     params: {
-      page,
       limit,
       sort,
+      ...(anchor
+        ? { anchor }
+        : cursor
+          ? { cursor, direction }
+          : {}),
       ...(category ? { category } : {}),
     },
   });

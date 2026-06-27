@@ -2,7 +2,14 @@ import { create } from "zustand";
 
 import type { GenerationMethod, Sort } from "@/types/product";
 
-/** Selectable page sizes for the "Per page" control (20 → 100). */
+export type Nav =
+  | { type: "first" }
+  | { type: "after"; cursor: string }
+  | { type: "before"; cursor: string }
+  | { type: "snap"; anchor: string };
+
+const FIRST_PAGE: Nav = { type: "first" };
+
 export const PER_PAGE_OPTIONS = [20, 40, 60, 80, 100] as const;
 export const DEFAULT_PER_PAGE = 20;
 
@@ -13,21 +20,23 @@ export interface LastRun {
 }
 
 interface ProductState {
-  // List / browse state
   sort: Sort;
-  category: string; // "all" or a category id
-  page: number;
+  category: string;
   perPage: number;
-  // Generation form state
+  nav: Nav;
+  anchorCursor: string | null;
   count: number;
   method: GenerationMethod;
-  // Status line
   lastRun: LastRun | null;
 
   setSort: (sort: Sort) => void;
   setCategory: (category: string) => void;
-  setPage: (page: number) => void;
   setPerPage: (perPage: number) => void;
+  goNext: (lastCursor: string) => void;
+  goPrev: (firstCursor: string) => void;
+  snapTo: (anchor: string) => void;
+  resetNav: () => void;
+  setAnchorCursor: (cursor: string | null) => void;
   setCount: (count: number) => void;
   setMethod: (method: GenerationMethod) => void;
   setLastRun: (lastRun: LastRun) => void;
@@ -36,17 +45,21 @@ interface ProductState {
 export const useProductStore = create<ProductState>((set) => ({
   sort: "newest",
   category: "all",
-  page: 1,
   perPage: DEFAULT_PER_PAGE,
+  nav: FIRST_PAGE,
+  anchorCursor: null,
   count: 12,
   method: "promise",
   lastRun: null,
 
-  // Changing sort, category, or page size always returns to the first page.
-  setSort: (sort) => set({ sort, page: 1 }),
-  setCategory: (category) => set({ category, page: 1 }),
-  setPage: (page) => set({ page }),
-  setPerPage: (perPage) => set({ perPage, page: 1 }),
+  setSort: (sort) => set({ sort, nav: FIRST_PAGE }),
+  setCategory: (category) => set({ category, nav: FIRST_PAGE }),
+  setPerPage: (perPage) => set({ perPage, nav: FIRST_PAGE }),
+  goNext: (lastCursor) => set({ nav: { type: "after", cursor: lastCursor } }),
+  goPrev: (firstCursor) => set({ nav: { type: "before", cursor: firstCursor } }),
+  snapTo: (anchor) => set({ nav: { type: "snap", anchor } }),
+  resetNav: () => set({ nav: FIRST_PAGE }),
+  setAnchorCursor: (cursor) => set({ anchorCursor: cursor }),
   setCount: (count) => set({ count }),
   setMethod: (method) => set({ method }),
   setLastRun: (lastRun) => set({ lastRun }),

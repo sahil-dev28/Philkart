@@ -2,6 +2,8 @@ export type Sort = "newest" | "oldest" | "aToZ" | "zToA" | "highest" | "lowest";
 
 export type GenerationMethod = "promise" | "worker";
 
+export type Direction = "after" | "before";
+
 export interface Category {
   _id: string;
   name: string;
@@ -12,7 +14,6 @@ export interface Product {
   _id: string;
   name: string;
   description: string;
-  /** Populated by the API; may be null if the referenced category is missing. */
   category: Category | null;
   price: number;
   image: string;
@@ -21,9 +22,11 @@ export interface Product {
 }
 
 export interface ProductsResponse {
-  page: number;
-  total: number;
   data: Product[];
+  firstCursor: string | null;
+  lastCursor: string | null;
+  offset: number;
+  total: number;
 }
 
 export interface CategoriesResponse {
@@ -31,9 +34,10 @@ export interface CategoriesResponse {
 }
 
 export interface GetProductsParams {
-  page: number;
+  cursor?: string | null;
+  direction?: Direction;
+  anchor?: string | null;
   limit: number;
   sort: Sort;
-  /** Category id. Omitted entirely when browsing "all". */
   category?: string;
 }

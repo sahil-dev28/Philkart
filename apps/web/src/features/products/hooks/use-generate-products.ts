@@ -10,14 +10,10 @@ interface GenerateInput {
   method: GenerationMethod;
 }
 
-/**
- * Triggers server-side generation via the chosen endpoint, measures the
- * round-trip, records it for the status line, and refetches the product list.
- */
 export function useGenerateProducts() {
-  const queryClient = useQueryClient();
   const setLastRun = useProductStore((s) => s.setLastRun);
-  const setPage = useProductStore((s) => s.setPage);
+  const snapTo = useProductStore((s) => s.snapTo);
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ count, method }: GenerateInput) => {
@@ -30,6 +26,8 @@ export function useGenerateProducts() {
     },
     onSuccess: ({ count, method, ms }) => {
       setLastRun({ n: count, method, ms });
+      const anchor = useProductStore.getState().anchorCursor;
+      if (anchor) snapTo(anchor);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(`Generated ${count} products with ${method}`, {
         description: `${ms.toFixed(1)} ms round-trip`,

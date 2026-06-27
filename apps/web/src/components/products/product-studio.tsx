@@ -15,19 +15,34 @@ import { Toolbar } from "./toolbar";
 export function ProductStudio() {
   const { data, isPending, isPlaceholderData, isError, error, refetch } =
     useProducts();
-  const page = useProductStore((s) => s.page);
+
+  const sort = useProductStore((s) => s.sort);
+  const category = useProductStore((s) => s.category);
   const perPage = useProductStore((s) => s.perPage);
-  const setPage = useProductStore((s) => s.setPage);
+  const nav = useProductStore((s) => s.nav);
+  const goNext = useProductStore((s) => s.goNext);
+  const goPrev = useProductStore((s) => s.goPrev);
+  const setAnchorCursor = useProductStore((s) => s.setAnchorCursor);
 
-  const total = data?.total ?? 0;
-  const pages = Math.max(1, Math.ceil(total / perPage));
   const products = data?.data ?? [];
+  const offset = data?.offset ?? 0;
+  const total = data?.total ?? null;
+  const firstCursor = data?.firstCursor ?? null;
+  const lastCursor = data?.lastCursor ?? null;
 
-  // Jump back to the top so the new page's products start in view.
+  const page = products.length ? Math.floor(offset / perPage) + 1 : 1;
+  const totalPages = total ? Math.max(1, Math.ceil(total / perPage)) : 1;
+  const hasPrev = offset > 0;
+  const hasNext = total != null && offset + products.length < total;
+
+  useEffect(() => {
+    if (firstCursor) setAnchorCursor(firstCursor);
+  }, [firstCursor, setAnchorCursor]);
+
   const scrollRef = useRef<HTMLElement>(null);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  }, [page]);
+  }, [nav, sort, category, perPage]);
 
   return (
     <main ref={scrollRef} className="min-h-0 overflow-y-auto">
@@ -44,7 +59,13 @@ export function ProductStudio() {
 
         <ControlsCard />
 
-        <Toolbar total={total} page={page} pages={pages} />
+        <Toolbar
+          total={total}
+          page={page}
+          offset={offset}
+          loaded={products.length}
+          perPage={perPage}
+        />
 
         {isError ? (
           <ErrorState
@@ -62,7 +83,15 @@ export function ProductStudio() {
           />
         )}
 
-        <ProductPagination page={page} pages={pages} onPageChange={setPage} />
+        <ProductPagination
+          page={page}
+          totalPages={totalPages}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          isFetching={isPlaceholderData}
+          onPrev={() => firstCursor && goPrev(firstCursor)}
+          onNext={() => lastCursor && goNext(lastCursor)}
+        />
       </div>
     </main>
   );
