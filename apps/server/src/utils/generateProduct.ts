@@ -5,6 +5,8 @@ import { faker } from "@faker-js/faker";
 import { categoryNames } from "@/schema/category";
 
 import type { CreateProductInput } from "../schema/product";
+import { Category } from "@/models/Category";
+import { Product } from "@/models/Product";
 
 export const generateProduct = () => {
   return {
@@ -20,18 +22,27 @@ export const generateProduct = () => {
 export const generateProductsWithPromise = async (
   total: number,
   batchSize = 1000,
-): Promise<CreateProductInput[]> => {
-  const result: CreateProductInput[] = [];
-
+): Promise<void> => {
   for (let i = 0; i < total; i++) {
-    result.push(generateProduct());
+    const { name, category, image, price, description } = generateProduct();
+    const categoryDoc = await Category.findOne({ name: category });
+
+    if (categoryDoc) {
+      const newProduct = new Product({
+        name,
+        category: categoryDoc._id,
+        price,
+        image,
+        description,
+      });
+
+      await newProduct.save();
+    }
 
     if ((i + 1) % batchSize === 0) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
   }
-
-  return result;
 };
 
 // Generating Products With Streaming

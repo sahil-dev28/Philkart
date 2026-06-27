@@ -42,9 +42,9 @@ export const generateProductsBuffered = async (
   _req: Request,
   res: Response,
 ): Promise<void> => {
-  const products = await generateProductsWithPromise(100000);
+  await generateProductsWithPromise(100000);
   res.status(200).json({
-    products,
+    message: "Product generated with promise",
   });
 };
 
