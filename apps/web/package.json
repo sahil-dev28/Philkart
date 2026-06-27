@@ -10,6 +10,8 @@
   "dependencies": {
     "@philkart/env": "workspace:*",
     "@philkart/ui": "workspace:*",
+    "@tanstack/react-query": "^5.0.0",
+    "axios": "^1.6.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "dotenv": "catalog:",
     "lucide-react": "catalog:",
@@ -17,8 +19,11 @@
     "next-themes": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-hook-form": "^7.50.0",
+    "react-paginate": "^8.2.0",
     "sonner": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@philkart/config": "workspace:*",
