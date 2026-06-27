@@ -3,14 +3,12 @@ const currency = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
-/** 5499.9 -> "$5,499.90" */
 export function formatPrice(value: number): string {
   return currency.format(value);
 }
 
 const DAY_MS = 86_400_000;
 
-/** ISO date -> "today" | "yesterday" | "Nd ago" | "Nw ago" | "Nmo ago" | "Ny ago" */
 export function formatRelativeDate(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";

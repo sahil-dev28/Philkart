@@ -2,7 +2,6 @@
 
 import { useProductStore } from "@/store/product-store";
 
-/** Header right: "{n} products · {method} · {ms} ms", or "ready" before first run. */
 export function StatusLine() {
   const lastRun = useProductStore((s) => s.lastRun);
 

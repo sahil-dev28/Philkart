@@ -8,7 +8,6 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
       <div className="relative">
-        {/* Generated images are remote (picsum) with redirects; a plain img avoids next/image remote config. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={product.image}

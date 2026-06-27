@@ -1,6 +1,5 @@
 @import "@philkart/ui/globals.css";
 
-/* Indeterminate progress bar used by the product grid loading state. */
 .animate-indeterminate {
   animation: indeterminate 1.1s ease-in-out infinite;
 }

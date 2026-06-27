@@ -11,9 +11,7 @@ const GRID =
 
 interface ProductGridProps {
   products: Product[];
-  /** First load with no data yet — show skeletons. */
   isLoading: boolean;
-  /** Page/filter/sort change while previous data is still shown — dim + overlay. */
   isFetching?: boolean;
   skeletonCount?: number;
 }
