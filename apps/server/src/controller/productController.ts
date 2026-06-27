@@ -2,9 +2,11 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import type { Request, Response } from "express";
+import { Types, type QueryFilter } from "mongoose";
 
 import { Category } from "@/models/Category";
-import { Product } from "@/models/Product";
+import { Product, type ProductAttrs } from "@/models/Product";
+import { decodeCursor, encodeCursor } from "@/utils/cursor";
 import {
   generateProductsWithPromise,
   generateProductsWithStreaming,
@@ -102,53 +104,146 @@ export const generateProductsParallel = async (
   }
 };
 
-const SORTABLE = {
-  newest: { createdAt: -1 },
-  oldest: { createdAt: 1 },
-  aToZ: {
-    name: 1,
-  },
-  zToA: {
-    name: -1,
-  },
-  highest: {
-    price: -1,
-  },
-  lowest: {
-    price: 1,
-  },
+// Each sort option maps to a field + direction. Keyset pagination always adds
+// `_id` as a tiebreaker so the ordering is stable even when the field repeats.
+const SORT_FIELDS = {
+  newest: { field: "createdAt", dir: -1 },
+  oldest: { field: "createdAt", dir: 1 },
+  aToZ: { field: "name", dir: 1 },
+  zToA: { field: "name", dir: -1 },
+  highest: { field: "price", dir: -1 },
+  lowest: { field: "price", dir: 1 },
 } as const;
+
+// Cast a cursor's stored value back to the type used for comparison.
+const castValue = (field: string, v: string | number): Date | number | string =>
+  field === "createdAt"
+    ? new Date(v)
+    : field === "price"
+      ? Number(v)
+      : String(v);
+
+// Serialize a row's sort-field value for embedding into the next cursor.
+const serializeValue = (field: string, val: unknown): string | number =>
+  field === "createdAt"
+    ? (val as Date).toISOString()
+    : (val as string | number);
+
+// Build the keyset (value, _id) comparison filter for one direction of travel.
+// `op` is the strict comparison ($gt / $lt) appropriate for that direction.
+const keysetFilter = (
+  field: string,
+  op: "$gt" | "$lt",
+  value: Date | number | string,
+  id: Types.ObjectId,
+): QueryFilter<ProductAttrs> => ({
+  $or: [{ [field]: { [op]: value } }, { [field]: value, _id: { [op]: id } }],
+});
 
 export const getProducts = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
-    const sort = req.query.sort as keyof typeof SORTABLE;
+    // Page size is driven by the request; defaults to 20, capped at 100.
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const sortKey = (req.query.sort as keyof typeof SORT_FIELDS) || "newest";
+    const { field, dir } = SORT_FIELDS[sortKey] ?? SORT_FIELDS.newest;
     const category = req.query.category as string | undefined;
+    const cursorRaw = req.query.cursor as string | undefined;
+    const anchorRaw = req.query.anchor as string | undefined;
+    // "after" walks forward (Next); "before" walks back toward the front (Prev).
+    const direction = req.query.direction === "before" ? "before" : "after";
 
-    const sortingOption = SORTABLE[sort || "newest"];
+    const baseFilter: QueryFilter<ProductAttrs> = category ? { category } : {};
+    // In display order, "after" follows the sort direction and "before" opposes
+    // it. For newest (dir -1) that means after = $lt (older), before = $gt.
+    const afterOp = dir === 1 ? "$gt" : "$lt";
+    const beforeOp = dir === 1 ? "$lt" : "$gt";
 
-    const skip = (page - 1) * limit;
+    // Count rows sorting before a given (value, _id) pair — i.e. its 0-based
+    // position in the list. Used for the live page number and to snap.
+    const positionOf = (value: Date | number | string, id: Types.ObjectId) =>
+      Product.countDocuments({
+        ...baseFilter,
+        ...keysetFilter(field, beforeOp, value, id),
+      });
 
-    const filter = category ? { category } : {};
+    const anchor = anchorRaw ? decodeCursor(anchorRaw) : null;
 
-    const [data, total] = await Promise.all([
-      Product.find(filter)
+    let data: Record<string, unknown>[];
+    // `offset` = how many rows sort before the first row on this page. With
+    // pages snapped to a perPage grid it is always a clean multiple of `limit`,
+    // so page numbers never drift when rows are inserted at the front.
+    let offset: number;
+
+    if (anchor) {
+      // Snap mode (after a generate): re-anchor to the grid-aligned page that
+      // contains the anchor row, so the user keeps their place on a clean page
+      // no matter how many rows were just inserted ahead of it.
+      const anchorPos = await positionOf(
+        castValue(field, anchor.v),
+        new Types.ObjectId(anchor.id),
+      );
+      offset = Math.floor(anchorPos / limit) * limit;
+      data = (await Product.find(baseFilter)
         .populate("category", "name slug")
-        .sort(sortingOption)
-        .skip(skip)
+        .sort({ [field]: dir, _id: dir })
+        .skip(offset)
         .limit(limit)
-        .lean(),
-      Product.countDocuments(filter),
-    ]);
+        .lean()) as unknown as Record<string, unknown>[];
+    } else {
+      const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
+      let filter: QueryFilter<ProductAttrs> = baseFilter;
+      // "before" scans in reverse so we collect the rows nearest the cursor,
+      // then flip them back into display order below.
+      let scanDir = dir;
+      if (cursor) {
+        const value = castValue(field, cursor.v);
+        const id = new Types.ObjectId(cursor.id);
+        if (direction === "before") {
+          filter = { ...baseFilter, ...keysetFilter(field, beforeOp, value, id) };
+          scanDir = (dir * -1) as 1 | -1;
+        } else {
+          filter = { ...baseFilter, ...keysetFilter(field, afterOp, value, id) };
+        }
+      }
+
+      const rows = (await Product.find(filter)
+        .populate("category", "name slug")
+        .sort({ [field]: scanDir, _id: scanDir })
+        .limit(limit)
+        .lean()) as unknown as Record<string, unknown>[];
+
+      // Restore display order for reverse ("before") scans.
+      data = scanDir === dir ? rows : rows.reverse();
+      const head = data[0];
+      offset = head
+        ? await positionOf(
+            head[field] as Date | number | string,
+            new Types.ObjectId(String(head._id)),
+          )
+        : 0;
+    }
+
+    const first = data[0];
+    const last = data[data.length - 1];
+    const cursorFor = (row: typeof first) =>
+      row
+        ? encodeCursor({
+            v: serializeValue(field, (row as Record<string, unknown>)[field]),
+            id: String(row._id),
+          })
+        : null;
+
+    const total = await Product.countDocuments(baseFilter);
 
     res.status(200).json({
-      page,
-      total,
       data,
+      firstCursor: cursorFor(first),
+      lastCursor: cursorFor(last),
+      offset,
+      total,
     });
   } catch (error) {
     res.status(400).json({
