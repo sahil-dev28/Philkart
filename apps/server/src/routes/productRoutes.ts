@@ -6,13 +6,17 @@ import {
   createProduct,
   generateProductsBuffered,
   generateProductsParallel,
+  getProducts,
   streamProducts,
 } from "../controller/productController";
 import { validateData } from "../middleware/validationMiddleware";
 
 export const productRouter: Router = Router();
 
-productRouter.route("/").post(validateData(createProductSchema), createProduct);
+productRouter
+  .route("/")
+  .post(validateData(createProductSchema), createProduct)
+  .get(getProducts);
 
 // Route with promise
 productRouter.route("/promise").get(generateProductsBuffered);

@@ -81,3 +81,11 @@ export const generateProductsParallel = async (
     products,
   });
 };
+
+export const getProducts = (req, res) => {
+  res.status(200).json({
+    page: 1,
+    total: 100,
+    data: [],
+  });
+};
