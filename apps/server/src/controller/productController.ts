@@ -104,8 +104,6 @@ export const generateProductsParallel = async (
   }
 };
 
-// Each sort option maps to a field + direction. Keyset pagination always adds
-// `_id` as a tiebreaker so the ordering is stable even when the field repeats.
 const SORT_FIELDS = {
   newest: { field: "createdAt", dir: -1 },
   oldest: { field: "createdAt", dir: 1 },
@@ -115,7 +113,7 @@ const SORT_FIELDS = {
   lowest: { field: "price", dir: 1 },
 } as const;
 
-// Cast a cursor's stored value back to the type used for comparison.
+
 const castValue = (field: string, v: string | number): Date | number | string =>
   field === "createdAt"
     ? new Date(v)
@@ -123,14 +121,13 @@ const castValue = (field: string, v: string | number): Date | number | string =>
       ? Number(v)
       : String(v);
 
-// Serialize a row's sort-field value for embedding into the next cursor.
+
 const serializeValue = (field: string, val: unknown): string | number =>
   field === "createdAt"
     ? (val as Date).toISOString()
     : (val as string | number);
 
-// Build the keyset (value, _id) comparison filter for one direction of travel.
-// `op` is the strict comparison ($gt / $lt) appropriate for that direction.
+
 const keysetFilter = (
   field: string,
   op: "$gt" | "$lt",
@@ -152,17 +149,14 @@ export const getProducts = async (
     const category = req.query.category as string | undefined;
     const cursorRaw = req.query.cursor as string | undefined;
     const anchorRaw = req.query.anchor as string | undefined;
-    // "after" walks forward (Next); "before" walks back toward the front (Prev).
+
     const direction = req.query.direction === "before" ? "before" : "after";
 
     const baseFilter: QueryFilter<ProductAttrs> = category ? { category } : {};
-    // In display order, "after" follows the sort direction and "before" opposes
-    // it. For newest (dir -1) that means after = $lt (older), before = $gt.
+
     const afterOp = dir === 1 ? "$gt" : "$lt";
     const beforeOp = dir === 1 ? "$lt" : "$gt";
 
-    // Count rows sorting before a given (value, _id) pair — i.e. its 0-based
-    // position in the list. Used for the live page number and to snap.
     const positionOf = (value: Date | number | string, id: Types.ObjectId) =>
       Product.countDocuments({
         ...baseFilter,
@@ -172,15 +166,11 @@ export const getProducts = async (
     const anchor = anchorRaw ? decodeCursor(anchorRaw) : null;
 
     let data: Record<string, unknown>[];
-    // `offset` = how many rows sort before the first row on this page. With
-    // pages snapped to a perPage grid it is always a clean multiple of `limit`,
-    // so page numbers never drift when rows are inserted at the front.
+   
     let offset: number;
 
     if (anchor) {
-      // Snap mode (after a generate): re-anchor to the grid-aligned page that
-      // contains the anchor row, so the user keeps their place on a clean page
-      // no matter how many rows were just inserted ahead of it.
+
       const anchorPos = await positionOf(
         castValue(field, anchor.v),
         new Types.ObjectId(anchor.id),
@@ -195,8 +185,7 @@ export const getProducts = async (
     } else {
       const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
       let filter: QueryFilter<ProductAttrs> = baseFilter;
-      // "before" scans in reverse so we collect the rows nearest the cursor,
-      // then flip them back into display order below.
+   
       let scanDir = dir;
       if (cursor) {
         const value = castValue(field, cursor.v);
