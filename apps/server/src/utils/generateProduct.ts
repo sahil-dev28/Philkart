@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import { faker } from "@faker-js/faker";
@@ -80,6 +83,18 @@ export async function* generateProductsWithStreaming(
   yield "]}";
 }
 
+// Resolve the worker file in both dev and prod. Under tsx this module runs from
+// src/utils, so the worker sits one level up in src/worker; in the production
+// bundle this code is inlined into dist/app.mjs with the worker emitted beside
+// it in dist/worker. tsdown leaves the worker URL untouched, so pick whichever
+// path actually exists.
+const resolveWorkerURL = (): URL => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const bundled = join(here, "worker", "worker-product.mjs");
+  const source = join(here, "..", "worker", "worker-product.ts");
+  return pathToFileURL(existsSync(bundled) ? bundled : source);
+};
+
 const THREAD_COUNT = 4;
 
 export async function generateProductsWithWorker(total: number): Promise<void> {
@@ -95,6 +110,8 @@ export async function generateProductsWithWorker(total: number): Promise<void> {
     categories.map((cat) => [cat.name, String(cat._id)]),
   );
 
+  const workerURL = resolveWorkerURL();
+
   return new Promise((resolve, reject) => {
     const perThread = Math.ceil(total / THREAD_COUNT);
 
@@ -102,9 +119,7 @@ export async function generateProductsWithWorker(total: number): Promise<void> {
     let settled = false;
 
     for (let i = 0; i < THREAD_COUNT; i++) {
-      const worker = new Worker(
-        new URL("../worker/worker-product.js", import.meta.url),
-      );
+      const worker = new Worker(workerURL);
 
       worker.on("message", (msg) => {
         if (msg?.error) {

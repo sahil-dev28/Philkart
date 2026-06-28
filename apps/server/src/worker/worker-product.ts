@@ -1,37 +1,56 @@
 import { parentPort } from "node:worker_threads";
 
 import { env } from "@philkart/env/server";
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 
+import { Product, type ProductAttrs } from "@/models/Product";
 import { generateProduct } from "@/utils/generateProduct";
-
-import { Product } from "../models/Product";
 
 const batchSize = 1000;
 
-const generateProducts = async (total, categories) => {
-  let batch = [];
+type ProductSeed = Omit<ProductAttrs, "createdAt" | "updatedAt">;
+
+type WorkerInput = {
+  total: number;
+  categories: Map<string, string>;
+};
+
+const generateProducts = async (
+  total: number,
+  categories: Map<string, string>,
+): Promise<void> => {
+  let batch: ProductSeed[] = [];
 
   for (let i = 0; i < total; i++) {
     const { name, category, image, price, description } = generateProduct();
     const categoryId = categories.get(category);
 
     if (categoryId) {
-      batch.push({ name, category: categoryId, price, image, description });
+      batch.push({
+        name,
+        category: new Types.ObjectId(categoryId),
+        price,
+        image,
+        description,
+      });
     }
 
     if (batch.length === batchSize) {
-      await Product.insertMany(batch, { ordered: false });
+      await Product.insertMany<ProductSeed>(batch, { ordered: false });
       batch = [];
     }
   }
 
   if (batch.length > 0) {
-    await Product.insertMany(batch, { ordered: false });
+    await Product.insertMany<ProductSeed>(batch, { ordered: false });
   }
 };
 
-parentPort.on("message", async (data) => {
+if (!parentPort) {
+  throw new Error("worker-product must be run as a worker thread");
+}
+
+parentPort.on("message", async (data: WorkerInput) => {
   try {
     await mongoose.connect(env.DATABASE_URL);
     await generateProducts(data.total, data.categories);
